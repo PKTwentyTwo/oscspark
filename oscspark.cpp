@@ -3,6 +3,7 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <cstring>
 #include <cstdint>
 #include <set>
 // Change the below variables:
@@ -35,7 +36,12 @@ apg::pattern transformpt(apg::pattern pt) {
     }
     return pt;
 }
-
+uint64_t GetPatternDigest(apg::pattern pat) {
+    if (pat.empty()) { return 0; }
+    int64_t bbox[4];
+    pat.getrect(bbox);
+    return pat.shift(0 - bbox[0], 0 - bbox[1]).digest();
+}
 
 // lifelib really should have an octodigest function at the C++ level.
 // I should write a pull request later.
@@ -117,19 +123,16 @@ int checkregen(apg::pattern pt, apg::pattern target, int gens, int ptgen) {
 //Function to do the actual searching:
 void searchpt(int gens) {
     apg::pattern sparkpt(&lt, spark, rule);
-    apg::pattern tpt(&lt, spark, rule);
     apg::pattern regionpt(&lt, region, rule);
     std::vector<apg::pattern> sparkpts;
     sparkpts.reserve(8);
     int i, j;
     for (auto i : orientations) {
+        apg::pattern tpt = sparkpt.shift(0, 0);
         if (i != "none") {
-            apg::pattern tpt = sparkpt.transform(i, 0, 0);
+            tpt = sparkpt.transform(i, 0, 0);
         }
-        else {
-            apg::pattern tpt = sparkpt.shift(0, 0);
-        }
-        uint64_t digest = tpt.digest();
+        uint64_t digest = GetPatternDigest(tpt);
         if (octodigests.find(digest) == octodigests.end()) {
             octodigests.insert(digest);
             sparkpts.push_back(sparkpt.transform(i, 0, 0));
@@ -148,8 +151,8 @@ void searchpt(int gens) {
             apg::pattern ptcopy1 = regionpt[gen];
             int64_t bbox[4] = {0, 0, 0, 0};
             ptcopy1.getrect(bbox);
-            for (i = bbox[0]-3; i < bbox[0] + bbox[2]+2; i++) {
-                for (j = bbox[1]-3; j < bbox[1] + bbox[3]+2; j++) {
+            for (i = bbox[0]-6; i < bbox[0] + bbox[2]+5; i++) {
+                for (j = bbox[1]-6; j < bbox[1] + bbox[3]+5; j++) {
                     //std::cout << i << "," << j << std::endl;
                     apg::pattern ptcopy2 = ptcopy1[0];
                     ptcopy2 += sparkpt.shift(i, j);
@@ -165,7 +168,7 @@ void searchpt(int gens) {
                                 octodigests.insert(octodigest);
                                 patterns++;
                                 if (patterns%5 == 0) {
-                                    std::cout << patterns << " solutions found." << std::endl;
+                                    std::cout << patterns << " partials found." << std::endl;
                                 }
                             }
                         }
@@ -185,6 +188,19 @@ void searchpt(int gens) {
     std::cout << getrle(stamp) << std::endl;
 }
         
-int main() {
+int main(int argc, char* argv[]) {
+    if (argc < 4) {
+        if (argc == 2) {
+            if (strcmp(argv[1], "-h") == 0)  {
+                std::cout << "Usage: oscspark <rule> 'region_rle' 'spark_rle'\nrule:     The rule being searched. Run './compile.sh <rule>' first.\n\nregion_rle:   The RLE of the active region you want to spark.\nMust be headerless and enclosed by quotes.\n\nspark_rle: The RLE of the spark you want to use.\nMust be headerless and enclosed by quotes - e.g 'o!'" << std::endl;
+                return 0;
+            }
+        }
+        std::cout << "Usage: oscspark <rule> 'region_rle' 'spark_rle'\nTry './oscspark -h' for more information." << std::endl;
+        return 0;
+    }
+    rule = argv[1];
+    region = argv[2];
+    spark = argv[3];
     searchpt(100);
 }
